@@ -1,0 +1,28 @@
+{
+  "name": "offline_academy",
+  "version": "1.0.0",
+  "description": "Chrome extension to save Cisco NetAcad Lessons as Markdown",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --config webpack/webpack.config.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/melektron/offline_academy.git"
+  },
+  "author": "melektron",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/melektron/offline_academy/issues"
+  },
+  "homepage": "https://github.com/melektron/offline_academy#readme",
+  "devDependencies": {
+    "@types/chrome": "^0.0.235",
+    "copy-webpack-plugin": "^11.0.0",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.4",
+    "webpack": "^5.82.0",
+    "webpack-cli": "^5.0.2"
+  }
+}
