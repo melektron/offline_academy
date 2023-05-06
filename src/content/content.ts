@@ -1,4 +1,4 @@
-import { React } from "./fake_react";
+//import { React } from "./fake_react";
 
 
 
@@ -15,13 +15,13 @@ function installButton() {
     if (toolbar == null)
         return;
 
-    toolbar.appendChild(
+    /*toolbar.appendChild(
         <div class="tooltip" data-tooltipped="" aria-describedby="tippy-tooltip-1" data-original-title="Recently Viewed" style="display: inline;">
             <button class="btn btn--large btn--default btn--icon" icon="recent-apps" aria-label="Recently Viewed" color="default">
                 <span class="icon-recent-apps"></span>
             </button>
         </div>
-    )
+    )*/
 }
 
 

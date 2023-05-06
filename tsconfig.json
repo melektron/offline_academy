@@ -5,7 +5,6 @@
         "target": "es6",
         "esModuleInterop": true,
         "sourceMap": true,
-        "jsx": "react",
         "rootDir": "src",
         "outDir": "dist/js",
         "noEmitOnError": true,
