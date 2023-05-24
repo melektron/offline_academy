@@ -1,26 +1,25 @@
-//import { React } from "./fake_react";
-
 
 
 const article = document.getElementsByClassName("content-chunks");
 
 
 function buttonCallback() {
-
+    processContent()
 }
 
 
+/**
+ * installs a download button on the toolbar of NetAcad
+ */
 function installButton() {
     const toolbar = document.getElementsByClassName("header-toolbar")[0];
-    console.log("Toolbar: ", toolbar);
-
     if (toolbar == null)
         return;
     
     let btn_div = document.createElement("div");
     btn_div.classList.add("tooltip");
-    btn_div.setAttribute("aria-describedby", "tippy-tooltip-1");
-    btn_div.setAttribute("data-original-title", "Save as Markdown");
+    btn_div.setAttribute("aria-describedby", "tippy-tooltip-6");
+    btn_div.setAttribute("data-original-title", "Download");
     btn_div.setAttribute("style", "display: inline;");
     toolbar.appendChild(btn_div);
     
@@ -29,19 +28,12 @@ function installButton() {
     btn_button.setAttribute("icon", "recent-apps");
     btn_button.setAttribute("aria-label", "Download");
     btn_button.setAttribute("color", "default");
+    btn_button.onclick = buttonCallback;
     btn_div.appendChild(btn_button);
 
-    let btn_span = document.createElement("button");
-    btn_span.classList.add("icon-recent-apps");
-    btn_div.appendChild(btn_span);
-
-    /*toolbar.appendChild(
-        <div class="tooltip" data-tooltipped="" aria-describedby="tippy-tooltip-1" data-original-title="Recently Viewed" style="display: inline;">
-            <button class="btn btn--large btn--default btn--icon" icon="recent-apps" aria-label="Recently Viewed" color="default">
-                <span class="icon-recent-apps"></span>
-            </button>
-        </div>
-    )*/
+    let btn_span = document.createElement("span");
+    btn_span.classList.add("icon-download");    // Cisco was nice enough to support the download icon by default just for me
+    btn_button.appendChild(btn_span);
 }
 
 
@@ -59,8 +51,6 @@ function processContent() {
     for (const chunk of content_chunks) {
         console.log(`Found chunk: ${chunk.id} ...`);
 
-
-        
         // search for the content container, if it doesn't exist this is the section Title and 
         // we can append it's content to the output
         const container = chunk.getElementsByClassName("container")[0];
@@ -115,6 +105,7 @@ function processContent() {
 function main() {
     installButton()
 }
-setTimeout(main, 5000);
+setTimeout(main, 1500);
 
+// @ts-ignore
 window.processContent = processContent;
