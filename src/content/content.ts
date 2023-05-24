@@ -12,8 +12,28 @@ function buttonCallback() {
 
 function installButton() {
     const toolbar = document.getElementsByClassName("header-toolbar")[0];
+    console.log("Toolbar: ", toolbar);
+
     if (toolbar == null)
         return;
+    
+    let btn_div = document.createElement("div");
+    btn_div.classList.add("tooltip");
+    btn_div.setAttribute("aria-describedby", "tippy-tooltip-1");
+    btn_div.setAttribute("data-original-title", "Save as Markdown");
+    btn_div.setAttribute("style", "display: inline;");
+    toolbar.appendChild(btn_div);
+    
+    let btn_button = document.createElement("button");
+    btn_button.classList.add("btn", "btn--large", "btn--default", "btn--icon");
+    btn_button.setAttribute("icon", "recent-apps");
+    btn_button.setAttribute("aria-label", "Download");
+    btn_button.setAttribute("color", "default");
+    btn_div.appendChild(btn_button);
+
+    let btn_span = document.createElement("button");
+    btn_span.classList.add("icon-recent-apps");
+    btn_div.appendChild(btn_span);
 
     /*toolbar.appendChild(
         <div class="tooltip" data-tooltipped="" aria-describedby="tippy-tooltip-1" data-original-title="Recently Viewed" style="display: inline;">
@@ -92,7 +112,9 @@ function processContent() {
 
 }
 
-
-setTimeout(processContent, 5000);
+function main() {
+    installButton()
+}
+setTimeout(main, 5000);
 
 window.processContent = processContent;
