@@ -77,20 +77,59 @@ function processContent() {
         let contentChunk = document.createElement("div")
         contentChunk.id = chunk.id;
 
-        // find all text assets in the content block
-        const text_assets = container.getElementsByClassName("text-asset");
+        // find all content components in the content block
+        // this includes direct text assets, media assets and tablists. some of these may
+        // need to be handeled separately
+        const content_components = container.querySelectorAll(".text-asset,div[role=\"tablist\"],.media-container");
         let is_first = true;
-        for (const asset of text_assets) {
-            console.log(asset.innerHTML);
-            for (const assetElement of asset.children) {
-                const assetElementCopy = assetElement.cloneNode(true);
-                if (is_first) {
-                    // the first text element is the header and we add the chunk index to it
-                    assetElementCopy.textContent = chunkIndex + " " + assetElementCopy.textContent;
-                    is_first = false;
+        let tablist_div: HTMLDivElement | undefined = undefined; // a variable to store a tablist if it is encountered, so descendence can be checked
+        for (const component of content_components) {
+            console.log("Processing component: ", component);
+
+            // check for text assets
+            if (
+                component.classList.contains("text-asset") && 
+                !component.classList.contains("button-label")  // we ignore the tablist button labels right away
+            ) {
+                console.log("Encountered text asset");
+                // if we have already encountered a tablist, check that the element is not part of the tablist.
+                // only process elements that are not directly part of a tablist
+                if (tablist_div !== undefined) {
+                    if (tablist_div.contains(component)) {
+                        console.log("(Is part of tablist, ignoring)");
+                        continue;
+                    }
                 }
-                contentChunk.appendChild(assetElementCopy);
+                
+                // if the element is not part of a tablist, we can save it
+                console.log(component.innerHTML);
+                for (const assetElement of component.children) {
+                    const assetElementCopy = assetElement.cloneNode(true);
+                    if (is_first) {
+                        // the first text element is the header and we add the chunk index to it
+                        assetElementCopy.textContent = chunkIndex + " " + assetElementCopy.textContent;
+                        is_first = false;
+                    }
+                    contentChunk.appendChild(assetElementCopy);
+                }
             }
+
+            // check for tablists
+            else if (
+                component.getAttribute("role") === "tablist"
+            ) {
+                console.log("Encountered tablist");
+                if (tablist_div !== undefined)
+                    throw new Error("Encountered multiple tablists in a chunk which is not allowed.");
+                    
+                tablist_div = component as HTMLDivElement;
+            }
+
+            // check for media containers
+            // also make sure they are not in a tablsit
+            // TODO:
+            
+           
         }
 
         // add the new content chunk to the final output to the output
