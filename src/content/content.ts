@@ -1,5 +1,10 @@
 
 
+
+const ASSET_BASE_PATH = "./assets/"
+
+
+
 const article = document.getElementsByClassName("content-chunks");
 
 
@@ -36,10 +41,39 @@ function installButton() {
     btn_button.appendChild(btn_span);
 }
 
+class Asset {
+    constructor(
+        public name: string | undefined,
+        public data: Promise<Response>
+    ) {}
+}
 
+/**
+ * downloads an asset from a provided url asynchronously
+ * 
+ * @param link link to the asset. This doesn't need to contain the base URI,
+ * just the path relative the the website root is fine. (e.g. "/content/imageabc.jpg")
+ * @returns an object containing the file name and a promise to the response containing the file contents
+ */
+function downloadAsset(link: string): Asset {
+    const asset_uri = new URL(link, document.baseURI);
+
+    return new Asset(
+        asset_uri.href.split("/").pop(),
+        fetch(asset_uri)
+    )
+}
+
+/**
+ * goes through all the content chunks of the currently loaded section
+ * and formats the content into nice formatted HTML text while also downloading any
+ * assets required
+ */
 function processContent() {
 
-    let contentOutput = document.createElement("div");
+    let output_content = document.createElement("div");
+    let output_assets = new Array<Asset>;
+
 
     const content_chunks_query = document.getElementsByClassName("content-chunks");
     if (content_chunks_query.length !== 1) {
@@ -60,10 +94,10 @@ function processContent() {
             if (sectionHeader == null) {
                 const errorHeader = document.createElement("h1");
                 errorHeader.innerText = "<Missing section header>";
-                contentOutput.appendChild(errorHeader);
+                output_content.appendChild(errorHeader);
             }
             else
-                contentOutput.appendChild(sectionHeader.cloneNode(true));
+                output_content.appendChild(sectionHeader.cloneNode(true));
 
             continue;
         }
@@ -74,8 +108,8 @@ function processContent() {
         const chunkIndex = indexElement.textContent ?? "";
 
         // create a new element for the chunk
-        let contentChunk = document.createElement("div")
-        contentChunk.id = chunk.id;
+        let output_current_chunk = document.createElement("div")
+        output_current_chunk.id = chunk.id;
 
         // find all content components in the content block
         // this includes direct text assets, media assets and tablists. some of these may
@@ -110,7 +144,7 @@ function processContent() {
                         assetElementCopy.textContent = chunkIndex + " " + assetElementCopy.textContent;
                         is_first = false;
                     }
-                    contentChunk.appendChild(assetElementCopy);
+                    output_current_chunk.appendChild(assetElementCopy);
                 }
             }
 
@@ -126,18 +160,89 @@ function processContent() {
             }
 
             // check for media containers
-            // also make sure they are not in a tablsit
-            // TODO:
+            else if (
+                component.classList.contains("media-container")
+            ) {
+                console.log("Encountered media asset");
+                // if we have already encountered a tablist, check that the element is not part of the tablist.
+                // only process elements that are not directly part of a tablist
+                if (tablist_div !== undefined) {
+                    if (tablist_div.contains(component)) {
+                        console.log("(Is part of tablist, ignoring)");
+                        continue;
+                    }
+                }
+
+                // ignore video, but put a note in the output that there would have been a video
+                if (component.classList.contains("media-video")) {
+                    const video_placeholder = document.createElement("p");
+                    video_placeholder.innerText = "(The video is only available in the online view, go there if you really need to look a the video.)";
+                    video_placeholder.style.fontWeight = "bold";
+                    output_current_chunk.appendChild(video_placeholder);
+                    continue;
+                }
+
+                // for image assets, look for an img tag and download the image from the source
+                else if (component.classList.contains("media-image")) {
+                    const image = component.querySelector("img[src]");
+                    if (image === null) {
+                        console.warn("Could not find image in media image asset, skipping.");
+                        continue;
+                    }
+                    const image_uri = image.getAttribute("src");
+                    if (image_uri === null || image_uri === "") {
+                        console.warn("Could not find image asset URI in media image asset, skipping.")
+                        continue;
+                    }
+                    const asset = downloadAsset(image_uri);
+                    if (asset.name === undefined) {
+                        console.warn("Media image asset URI invalid, skipping.")
+                        continue;
+                    }
+                    
+                    const output_element = document.createElement("img");
+                    output_element.src = ASSET_BASE_PATH + asset.name;
+                    output_current_chunk.appendChild(output_element);
+                }
+
+                // for graphic assets (svg), look for an svg tag and download the source
+                else if (component.classList.contains("media-graphic")) {
+                    const image = component.querySelector("svg[data-src]");
+                    if (image === null) {
+                        console.warn("Could not find graphic in media graphic asset, skipping.");
+                        continue;
+                    }
+                    const grahpic_uri = image.getAttribute("data-src");
+                    if (grahpic_uri === null || grahpic_uri === "") {
+                        console.warn("Could not find graphic asset URI in media graphic asset, skipping.")
+                        continue;
+                    }
+                    const asset = downloadAsset(grahpic_uri);
+                    if (asset.name === undefined) {
+                        console.warn("Media graphic asset URI invalid, skipping.")
+                        continue;
+                    }
+                    
+                    const output_element = document.createElement("img");
+                    output_element.src = ASSET_BASE_PATH + asset.name;
+                    output_current_chunk.appendChild(output_element);
+                }
+
+            }
+            
+            // any other types of media assets like quizzes are ignored with a message
+            else
+                console.log("(Not a relevant asset type)")
             
            
         }
 
         // add the new content chunk to the final output to the output
-        contentOutput.appendChild(contentChunk);
+        output_content.appendChild(output_current_chunk);
 
     }
 
-    console.log("\n\n\nText output done:", contentOutput);
+    console.log("\n\n\nText output done:", output_content);
 
 }
 

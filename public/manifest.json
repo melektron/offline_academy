@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Reading time",
+    "name": "Cisco Offline Academy",
     "version": "1.0",
-    "description": "Add the reading time to Chrome Extension documentation articles",
+    "description": "Adds a download button the Cisco NetAcad courses and allows exporting them as fully offline plain-HTML based documents",
     "content_scripts": [
         {
             "js": [
