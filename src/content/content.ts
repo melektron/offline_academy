@@ -219,6 +219,8 @@ class Section {
                     output_current_chunk.appendChild(code_block);
                 }
 
+                // TODO: Implement downloading of packet tracer activities
+
                 // check for tablists
                 else if (
                     component.getAttribute("role") === "tablist"
