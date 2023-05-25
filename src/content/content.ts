@@ -103,7 +103,7 @@ class Section {
             output_current_chunk.id = chunk.id;
 
             // find all content components in the chunk
-            // this includes direct text assets, media assets and tablists. Some of these may
+            // this includes direct text assets, code blocks, media assets and tablists. Some of these may
             // need to be treated specially
             const content_components = container.querySelectorAll(".text-asset,div[role=\"tablist\"],img,svg,code");
             
@@ -198,7 +198,7 @@ class Section {
                         
                     tablist_div = component as HTMLDivElement;
 
-                    // TODO: process tablist
+                    this.processTabList(output_current_chunk, tablist_div);
                 }
                 
                 // any other types of media assets like quizzes are ignored with a message
@@ -252,6 +252,78 @@ class Section {
         const output_element = document.createElement("img");
         output_element.src = ASSET_BASE_PATH + asset.name;
         current_chunk.appendChild(output_element);
+    }
+
+    processTabList(current_chunk: HTMLDivElement, tablist_element: HTMLDivElement) {
+        // find all the selection buttons in the tablist
+        const tablist_selection_buttons = tablist_element.getElementsByClassName("mbar-buttons-wrapper")[0].children;
+
+        // go through all button and therefore selections individually
+        for (const selection_button_element of tablist_selection_buttons) {
+            const button = selection_button_element as HTMLButtonElement;
+            
+            // The button text will be added to the document as a header 3
+            const tab_header = document.createElement("h3");
+            tab_header.innerText = button.innerText;
+            current_chunk.appendChild(tab_header);
+
+            // activate the tab
+            button.click();
+
+            // process the content of the current tab
+            const tab_content_wrapper = tablist_element.getElementsByClassName("mbar-content-wrapper")[0] as HTMLDivElement;
+            this.processTabContent(current_chunk, tab_content_wrapper);
+        }
+    }
+
+    processTabContent(current_chunk: HTMLDivElement, content_wrapper: HTMLDivElement) {
+        // find all content components in the tab.
+        // this includes direct text assets, code blocks and media assets. (Tablist in tablist does not exist)
+        const content_components = content_wrapper.querySelectorAll(".text-asset,img,svg,code");
+        
+        // go through all assets in the tab
+        for (const component of content_components) {
+            console.log("Processing tab component: ", component);
+
+            // check for text assets
+            if (
+                component.classList.contains("text-asset")
+            ) {
+                console.log("Encountered text asset in tab");
+                
+                for (const asset_element of component.children) {
+                    const asset_element_copy = asset_element.cloneNode(true);
+                    current_chunk.appendChild(asset_element_copy);
+                }
+            }
+
+            // check for images
+            else if (
+                component.tagName.toLocaleLowerCase() === "img"
+            ) {
+                this.processImage(current_chunk, component);
+            }
+
+            // check for graphics (SVGs)
+            else if (
+                component.tagName.toLocaleLowerCase() === "svg"
+            ) {
+                this.processGraphic(current_chunk, component);
+            }
+
+            // check for code blocks
+            else if (
+                component.tagName.toLowerCase() === "code"
+            ) {
+                const code_block = component.cloneNode(true) as HTMLDivElement;
+                code_block.style.whiteSpace = "pre-wrap";
+                current_chunk.appendChild(code_block);
+            }
+            
+            // in case there is any asset that doesn't match the above criteria (shouldn't ever happen)
+            else
+                console.log(`(Not a relevant asset type inside tablist tab: ${component.tagName})`)
+        }
     }
 }
 
