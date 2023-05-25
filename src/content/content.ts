@@ -7,8 +7,17 @@ www.elektron.work
 Content script that adds download functionality to NetAcad ContentHub
 */
 
+
 const ASSETS_DIR_NAME = "assets"
 const ASSET_BASE_PATH = "./" + ASSETS_DIR_NAME + "/";
+
+let main_directory_handle: FileSystemDirectoryHandle | undefined = undefined;
+
+
+// https://stackoverflow.com/questions/1183872/put-a-delay-in-javascript
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 
 /**
@@ -51,7 +60,7 @@ class Section {
      * and formats the content into nice formatted HTML text while also downloading any
      * assets required
      */
-    processCurrent() {
+    async processCurrent() {
         // first, find the module title and index this section is part of 
         // so it can be saved accordingly
         
@@ -246,7 +255,7 @@ class Section {
                 // process the tablist and add it's output elements to the ones before the tablist
                 if (output_current_chunk_before_tablist === undefined)
                     throw new Error("Processing tablist, but assets before tablist not defined");
-                this.processTabList(output_current_chunk_before_tablist, tablist_div);
+                await this.processTabList(output_current_chunk_before_tablist, tablist_div);
 
                 // now add the output elements of all the assets after the tablist to the output
                 for (const element of output_current_chunk.children) {
@@ -307,7 +316,7 @@ class Section {
         current_chunk.appendChild(output_element);
     }
 
-    processTabList(current_chunk: HTMLDivElement, tablist_element: HTMLDivElement) {
+    async processTabList(current_chunk: HTMLDivElement, tablist_element: HTMLDivElement) {
         // find all the selection buttons in the tablist
         const tablist_selection_buttons = tablist_element.getElementsByClassName("mbar-buttons-wrapper")[0].children;
 
@@ -325,6 +334,12 @@ class Section {
 
             // process the content of the current tab
             const tab_content_wrapper = tablist_element.getElementsByClassName("mbar-content-wrapper")[0] as HTMLDivElement;
+
+            // if there are any media assets in the tab that are loaded asynchronously using react we might need to wait
+            // a bit until they are fully loaded. Normal images don't suffer from this.
+            if (tab_content_wrapper.querySelector(".loader-wrap,.Media") != null)
+                await sleep(800);
+            
             this.processTabContent(current_chunk, tab_content_wrapper);
         }
     }
@@ -437,11 +452,9 @@ async function saveSection(_section: Section) {
     let settled_assets = await Promise.allSettled(_section.assets.map(a => a.data));
     console.log("assets finished downloading: ", settled_assets);
     
-    // ask for the directory to save files to
-    // @ts-ignore for some reason showDirectoryPicker() is detected here
-    const main_directory_handle: FileSystemDirectoryHandle = await window.showDirectoryPicker({
-        mode: "readwrite"
-    });
+    // main directory handle acquire used to be here
+    if (main_directory_handle == null)
+        throw new Error("Unknown save directory");
 
     // @ts-ignore open the module directory
     const module_directory_name = _section.module_index + "_" + _section.module_title.replaceAll(" ", "_");
@@ -491,10 +504,21 @@ async function saveSection(_section: Section) {
 }
 
 
-function buttonCallback() {
+// this function must not be async or else we get the error "Must be handling a user gesture to show a file picker."
+async function buttonCallback() {
+    // ask the user for the folder right away, because of transient activtion requirements
+
+    // ask for the directory to save files to
+    // @ts-ignore for some reason showDirectoryPicker() is detected here
+    main_directory_handle = await window.showDirectoryPicker({
+        mode: "readwrite"
+    });
+
     const section = new Section();
-    section.processCurrent();
-    saveSection(section);
+    await section.processCurrent();
+    await saveSection(section);
+
+    window.alert(`Download of section "${section.section_title}" complete.`);
 }
 
 /**
