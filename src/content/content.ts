@@ -1,46 +1,15 @@
+/*
+ELEKTRON © 2023
+Written by melektron
+www.elektron.work
+05.05.23, 21:33
 
-
+Content script that adds download functionality to NetAcad ContentHub
+*/
 
 const ASSETS_DIR_NAME = "assets"
 const ASSET_BASE_PATH = "./" + ASSETS_DIR_NAME + "/";
 
-
-const article = document.getElementsByClassName("content-chunks");
-
-
-function buttonCallback() {
-    const section = processCurrentSection();
-    saveSection(section);
-}
-
-
-/**
- * installs a download button on the toolbar of NetAcad
- */
-function installButton() {
-    const toolbar = document.getElementsByClassName("header-toolbar")[0];
-    if (toolbar == null)
-        return;
-    
-    let btn_div = document.createElement("div");
-    btn_div.classList.add("tooltip");
-    btn_div.setAttribute("aria-describedby", "tippy-tooltip-6");
-    btn_div.setAttribute("data-original-title", "Download");
-    btn_div.setAttribute("style", "display: inline;");
-    toolbar.appendChild(btn_div);
-    
-    let btn_button = document.createElement("button");
-    btn_button.classList.add("btn", "btn--large", "btn--default", "btn--icon");
-    btn_button.setAttribute("icon", "recent-apps");
-    btn_button.setAttribute("aria-label", "Download");
-    btn_button.setAttribute("color", "default");
-    btn_button.onclick = buttonCallback;
-    btn_div.appendChild(btn_button);
-
-    let btn_span = document.createElement("span");
-    btn_span.classList.add("icon-download");    // Cisco was nice enough to support the download icon by default just for me
-    btn_button.appendChild(btn_span);
-}
 
 /**
  * class representing an asset name and corresponding binary blob
@@ -63,16 +32,228 @@ class LoadingAsset {
 }
 
 class Section {
-    constructor(
-        public document: HTMLDivElement,
-        public assets: LoadingAsset[],
-        public module_index: number,
-        public module_title: string,
-        public section_index: number,
-        public section_title: string
-    ) {}
-}
 
+    public output_document: HTMLDivElement;
+    public assets: LoadingAsset[];
+    public module_index: number = 0;
+    public module_title: string = "";
+    public section_index: number = 0;
+    public section_title: string = "";
+
+    constructor(
+    ) {
+        this.output_document = document.createElement("div");
+        this.assets = new Array<LoadingAsset>;
+    }
+
+    /**
+     * goes through all the content chunks of the currently loaded section
+     * and formats the content into nice formatted HTML text while also downloading any
+     * assets required
+     */
+    processCurrent() {
+        // first, find the module title and index this section is part of 
+        // so it can be saved accordingly
+        
+        // we get the module title from the breadcrumb at the top of the page
+        const title_provider_elements = document.querySelectorAll(".breadcrumb > li:not(.home)");
+        if (title_provider_elements.length < 2)
+            throw new Error("Couldn't find module and/or section title in breadcrumb");
+        this.module_title = (title_provider_elements[0] as HTMLDivElement).innerText;
+        this.section_title = (title_provider_elements[1] as HTMLDivElement).innerText;
+        // add the section title to the output document as the heading right away
+        const output_section_header = document.createElement("h1");
+        output_section_header.innerText = this.section_title;
+        this.output_document.appendChild(output_section_header);
+
+        // we get the module and section index from one of the chunk index labels. We just use
+        // the first one (assuming that is the one the query selector returns)
+        const index_provider_element = document.querySelector(".current-li") as HTMLDivElement;
+        if (index_provider_element == null)
+            throw new Error("Couldn't find module and section index label");
+        const indices = index_provider_element.innerText.split(".");
+        this.module_index = +(indices[0]);
+        this.section_index = +(indices[1]);
+
+
+        // next we go through all the chunks and load the content
+        const content_chunks = document.querySelector(".content-chunks")?.children;
+        if (content_chunks == null) {
+            throw new Error("Invalid page, didn't find content chunks");
+        }
+
+        for (const chunk of content_chunks) {
+            console.log(`Found chunk: ${chunk.id} ...`);
+
+            // search for the content container of the chunk, if it doesn't exist the chunk
+            // is probably the section heading and we can just ignore it
+            const container = chunk.querySelector(".container");
+            if (container == null) {
+                console.log("(Is section heading chunk, ignoring)");
+                continue;
+            }
+            // otherwise this is a content chunk and we need to create a content div for it
+
+            // try to find the index of the chunk
+            const index_element = container.getElementsByClassName("current-li")[0];
+            const chunk_index = index_element.textContent ?? "";
+
+            // create a new output document element for the chunk
+            let output_current_chunk = document.createElement("div")
+            output_current_chunk.id = chunk.id;
+
+            // find all content components in the chunk
+            // this includes direct text assets, media assets and tablists. Some of these may
+            // need to be treated specially
+            const content_components = container.querySelectorAll(".text-asset,div[role=\"tablist\"],img,svg,code");
+            
+            // flag set to false after first test-asset is processed because the 
+            // first asset is the title which needs the chunk index appended
+            let is_first = true;
+            // a variable to store a tablist if it is encountered, so descendence can be checked
+            let tablist_div: HTMLDivElement | undefined = undefined;
+            // some components are part of a tablist and therefore shouldn't be processed separately.
+            // this function is used to check if we have already encountered a tablist, and that 
+            // an element is not part of the tablist.
+            const isPartOfTabList = (_component: Element) => {
+                // no tablist found jet
+                if (tablist_div === undefined)
+                    return false;
+                
+                // part of tablist
+                if (tablist_div.contains(_component)) {
+                    console.log("(Is part of tablist, ignoring)");
+                    return true;
+                }
+
+                return false;
+            }
+
+            for (const component of content_components) {
+                console.log("Processing component: ", component);
+
+                // check for text assets
+                if (
+                    component.classList.contains("text-asset") && 
+                    !component.classList.contains("button-label")  // we ignore the tablist button labels right away
+                ) {
+                    console.log("Encountered text asset");
+                    if (isPartOfTabList(component))
+                        continue;
+                    
+                    // if the element is not part of a tablist, we can save it
+                    for (const assetElement of component.children) {
+                        const assetElementCopy = assetElement.cloneNode(true);
+                        if (is_first) {
+                            // the first text element is the header and we add the chunk index to it
+                            assetElementCopy.textContent = chunk_index + " " + assetElementCopy.textContent;
+                            is_first = false;
+                        }
+                        output_current_chunk.appendChild(assetElementCopy);
+                    }
+                }
+
+                // check for images
+                else if (
+                    component.tagName.toLocaleLowerCase() === "img"
+                ) {
+                    console.log("Encountered image asset");
+                    if (isPartOfTabList(component))
+                        continue;
+
+                    this.processImage(output_current_chunk, component);
+                }
+
+                // check for graphics (SVGs)
+                else if (
+                    component.tagName.toLocaleLowerCase() === "svg"
+                ) {
+                    console.log("Encountered graphic asset");
+                    if (isPartOfTabList(component))
+                        continue;
+                    
+                    this.processGraphic(output_current_chunk, component);
+                }
+
+                // check for code blocks
+                else if (
+                    component.tagName.toLowerCase() === "code"
+                ) {
+                    console.log("Encountered code block");
+                    if (isPartOfTabList(component))
+                        continue;
+                    
+                    const code_block = component.cloneNode(true) as HTMLDivElement;
+                    code_block.style.whiteSpace = "pre-wrap";
+                    output_current_chunk.appendChild(code_block);
+                }
+
+                // check for tablists
+                else if (
+                    component.getAttribute("role") === "tablist"
+                ) {
+                    console.log("Encountered tablist");
+                    if (tablist_div !== undefined)
+                        throw new Error("Encountered multiple tablists in a chunk which is not allowed.");
+                        
+                    tablist_div = component as HTMLDivElement;
+
+                    // TODO: process tablist
+                }
+                
+                // any other types of media assets like quizzes are ignored with a message
+                else
+                    console.log(`(Not a relevant asset type: ${component.tagName})`)
+                
+            
+            }
+
+            // add the new content chunk to the final output to the output
+            this.output_document.appendChild(output_current_chunk);
+
+        }
+
+
+        console.log("\n\n\nSection parsing complete: ", this);
+        console.log("Section document preview: ", this.output_document);
+    }
+
+    processImage(current_chunk: HTMLDivElement, img_element: Element) {
+        const image_uri = img_element.getAttribute("src");
+        if (image_uri === null || image_uri === "") {
+            console.warn("Could not find image URI in image asset, skipping.")
+            return;
+        }
+        const asset = downloadAsset(image_uri);
+        if (asset.name === undefined) {
+            console.warn("Media image asset URI invalid, skipping.")
+            return;
+        }
+        this.assets.push(asset);
+
+        const output_element = document.createElement("img");
+        output_element.src = ASSET_BASE_PATH + asset.name;
+        current_chunk.appendChild(output_element);
+    }
+
+    processGraphic(current_chunk: HTMLDivElement, svg_element: Element) {
+        const grahpic_uri = svg_element.getAttribute("data-src");
+        if (grahpic_uri === null || grahpic_uri === "") {
+            console.warn("Could not find graphic URI in graphic asset, skipping.")
+            return;
+        }
+        const asset = downloadAsset(grahpic_uri);
+        if (asset.name === undefined) {
+            console.warn("Graphic asset URI invalid, skipping.")
+            return;
+        }
+        this.assets.push(asset);
+        
+        const output_element = document.createElement("img");
+        output_element.src = ASSET_BASE_PATH + asset.name;
+        current_chunk.appendChild(output_element);
+    }
+}
 
 /**
  * downloads an asset from a provided url asynchronously
@@ -119,228 +300,6 @@ function downloadAsset(link: string): LoadingAsset {
     );
 }
 
-/**
- * goes through all the content chunks of the currently loaded section
- * and formats the content into nice formatted HTML text while also downloading any
- * assets required
- */
-function processCurrentSection(): Section {
-
-    let output_document = document.createElement("div");
-    let output_assets = new Array<LoadingAsset>;
-    let output_module_index: number = 0;
-    let output_module_title: string = "";
-    let output_section_index: number = 0;
-    let output_section_title: string = "";
-
-    // first, find the module title and index this section is part of 
-    // so it can be saved accordingly
-    
-    // we get the module title from the breadcrumb at the top of the page
-    const title_proider_elements = document.querySelectorAll(".breadcrumb > li:not(.home)");
-    if (title_proider_elements.length < 2)
-        throw new Error("Couldn't find module and/or section title in breadcrumb");
-    output_module_title = (title_proider_elements[0] as HTMLDivElement).innerText;
-    output_section_title = (title_proider_elements[1] as HTMLDivElement).innerText;
-    // (section title could also be loaded here but we load it later for the document anyway)
-
-    // we get the module and section index from one of the chunk index labels. We just use
-    // the first one (assuming that is the one the query selector returns)
-    const index_providor_element = document.querySelector(".current-li") as HTMLDivElement;
-    if (index_providor_element == null)
-        throw new Error("Couldn't find module and section index label");
-    const indices = index_providor_element.innerText.split(".");
-    output_module_index = +(indices[0]);
-    output_section_index = +(indices[1]);
-
-
-    // next we go through all the chunks and load the content
-    const content_chunks_query = document.getElementsByClassName("content-chunks");
-    if (content_chunks_query.length !== 1) {
-        console.error("Invalid page, didn't find content chunks");
-    }
-    const content_chunks = content_chunks_query[0].children;
-
-    for (const chunk of content_chunks) {
-        console.log(`Found chunk: ${chunk.id} ...`);
-
-        // search for the content container, if it doesn't exist this is the section Title and 
-        // we can append it's content to the output document
-        const container = chunk.getElementsByClassName("container")[0];
-        if (container == null) {
-            console.log("... Is section header chunk");
-            const sectionHeader = chunk.firstElementChild as HTMLHeadingElement;
-            if (sectionHeader == null) {
-                const errorHeader = document.createElement("h1");
-                errorHeader.innerText = "<Missing section header>";
-                output_document.appendChild(errorHeader);
-            } else {
-                output_document.appendChild(sectionHeader.cloneNode(true));
-            }
-
-            continue;
-        }
-        // otherwise this is a content chunk and we need to create a content div for it
-
-        // try to find the index of the chunk
-        const indexElement = container.getElementsByClassName("current-li")[0];
-        const chunkIndex = indexElement.textContent ?? "";
-
-        // create a new output document element for the chunk
-        let output_current_chunk = document.createElement("div")
-        output_current_chunk.id = chunk.id;
-
-        // find all content components in the chunk
-        // this includes direct text assets, media assets and tablists. Some of these may
-        // need to be treated specially
-        const content_components = container.querySelectorAll(".text-asset,div[role=\"tablist\"],img,svg,code");
-        
-        let is_first = true;
-        let tablist_div: HTMLDivElement | undefined = undefined; // a variable to store a tablist if it is encountered, so descendence can be checked
-        const isPartOfTabList = (_component: Element) => {
-            // some components are part of a tablist and therefore shouldn't be processed separately.
-            // this function is used to check if we have already encountered a tablist, and that 
-            // an element is not part of the tablist.
-            
-            // no tablist found jet
-            if (tablist_div === undefined)
-                return false;
-            
-            // part of tablist
-            if (tablist_div.contains(_component)) {
-                console.log("(Is part of tablist, ignoring)");
-                return true;
-            }
-
-            return false;
-        }
-
-        for (const component of content_components) {
-            console.log("Processing component: ", component);
-
-            // check for text assets
-            if (
-                component.classList.contains("text-asset") && 
-                !component.classList.contains("button-label")  // we ignore the tablist button labels right away
-            ) {
-                console.log("Encountered text asset");
-                if (isPartOfTabList(component))
-                    continue;
-                
-                // if the element is not part of a tablist, we can save it
-                for (const assetElement of component.children) {
-                    const assetElementCopy = assetElement.cloneNode(true);
-                    if (is_first) {
-                        // the first text element is the header and we add the chunk index to it
-                        assetElementCopy.textContent = chunkIndex + " " + assetElementCopy.textContent;
-                        is_first = false;
-                    }
-                    output_current_chunk.appendChild(assetElementCopy);
-                }
-            }
-
-            // check for images
-            else if (
-                component.tagName.toLocaleLowerCase() === "img"
-            ) {
-                console.log("Encountered image asset");
-                if (isPartOfTabList(component))
-                    continue;
-
-                const image_uri = component.getAttribute("src");
-                if (image_uri === null || image_uri === "") {
-                    console.warn("Could not find image URI in image asset, skipping.")
-                    continue;
-                }
-                const asset = downloadAsset(image_uri);
-                if (asset.name === undefined) {
-                    console.warn("Media image asset URI invalid, skipping.")
-                    continue;
-                }
-                output_assets.push(asset);
-
-                const output_element = document.createElement("img");
-                output_element.src = ASSET_BASE_PATH + asset.name;
-                output_current_chunk.appendChild(output_element);
-            }
-
-            // check for graphics (SVGs)
-            else if (
-                component.tagName.toLocaleLowerCase() === "svg"
-            ) {
-                console.log("Encountered graphic asset");
-                if (isPartOfTabList(component))
-                    continue;
-                
-                const grahpic_uri = component.getAttribute("data-src");
-                if (grahpic_uri === null || grahpic_uri === "") {
-                    console.warn("Could not find graphic URI in graphic asset, skipping.")
-                    continue;
-                }
-                const asset = downloadAsset(grahpic_uri);
-                if (asset.name === undefined) {
-                    console.warn("Graphic asset URI invalid, skipping.")
-                    continue;
-                }
-                output_assets.push(asset);
-                
-                const output_element = document.createElement("img");
-                output_element.src = ASSET_BASE_PATH + asset.name;
-                output_current_chunk.appendChild(output_element);
-
-            }
-
-            // check for code blocks
-            else if (
-                component.tagName.toLowerCase() === "code"
-            ) {
-                console.log("Encountered code block");
-                if (isPartOfTabList(component))
-                    continue;
-                
-                const code_block = component.cloneNode(true) as HTMLDivElement;
-                code_block.style.whiteSpace = "pre-wrap";
-                output_current_chunk.appendChild(code_block);
-            }
-
-            // check for tablists
-            else if (
-                component.getAttribute("role") === "tablist"
-            ) {
-                console.log("Encountered tablist");
-                if (tablist_div !== undefined)
-                    throw new Error("Encountered multiple tablists in a chunk which is not allowed.");
-                    
-                tablist_div = component as HTMLDivElement;
-
-                // TODO: process tablist
-            }
-            
-            // any other types of media assets like quizzes are ignored with a message
-            else
-                console.log(`(Not a relevant asset type: ${component.tagName})`)
-            
-           
-        }
-
-        // add the new content chunk to the final output to the output
-        output_document.appendChild(output_current_chunk);
-
-    }
-
-    const output_section = new Section(
-        output_document,
-        output_assets,
-        output_module_index,
-        output_module_title,
-        output_section_index,
-        output_section_title
-    );
-
-    console.log("\n\n\nSection parsing complete: ", output_section);
-    console.log("Section document preview: ", output_section.document);
-    return output_section;
-}
 
 /**
  * Asks the user for the documentation storage folder and saves the constructed
@@ -374,7 +333,7 @@ async function saveSection(_section: Section) {
     const section_file_writable  = await section_file_handle.createWritable();
     await section_file_writable.write(
         "<html><body>" +
-        _section.document.innerHTML + 
+        _section.output_document.innerHTML + 
         "</body></html>"
     );
     await section_file_writable.close();
@@ -406,10 +365,43 @@ async function saveSection(_section: Section) {
 
 }
 
+
+function buttonCallback() {
+    const section = new Section();
+    section.processCurrent();
+    saveSection(section);
+}
+
+/**
+ * installs a download button on the toolbar of NetAcad
+ */
+function installButton() {
+    const toolbar = document.getElementsByClassName("header-toolbar")[0];
+    if (toolbar == null)
+        return;
+    
+    let btn_div = document.createElement("div");
+    btn_div.classList.add("tooltip");
+    btn_div.setAttribute("aria-describedby", "tippy-tooltip-6");
+    btn_div.setAttribute("data-original-title", "Download");
+    btn_div.setAttribute("style", "display: inline;");
+    toolbar.appendChild(btn_div);
+    
+    let btn_button = document.createElement("button");
+    btn_button.classList.add("btn", "btn--large", "btn--default", "btn--icon");
+    btn_button.setAttribute("icon", "recent-apps");
+    btn_button.setAttribute("aria-label", "Download");
+    btn_button.setAttribute("color", "default");
+    btn_button.onclick = buttonCallback;
+    btn_div.appendChild(btn_button);
+
+    let btn_span = document.createElement("span");
+    btn_span.classList.add("icon-download");    // Cisco was nice enough to support the download icon by default just for me
+    btn_button.appendChild(btn_span);
+}
+
+
 function main() {
     installButton()
 }
 setTimeout(main, 1500);
-
-// @ts-ignore
-window.processCurrentSection = processCurrentSection;
