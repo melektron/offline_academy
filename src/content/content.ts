@@ -193,7 +193,7 @@ function processCurrentSection(): Section {
         // find all content components in the chunk
         // this includes direct text assets, media assets and tablists. Some of these may
         // need to be treated specially
-        const content_components = container.querySelectorAll(".text-asset,div[role=\"tablist\"],img,svg");
+        const content_components = container.querySelectorAll(".text-asset,div[role=\"tablist\"],img,svg,code");
         
         let is_first = true;
         let tablist_div: HTMLDivElement | undefined = undefined; // a variable to store a tablist if it is encountered, so descendence can be checked
@@ -245,7 +245,7 @@ function processCurrentSection(): Section {
             ) {
                 console.log("Encountered image asset");
                 if (isPartOfTabList(component))
-                    continue
+                    continue;
 
                 const image_uri = component.getAttribute("src");
                 if (image_uri === null || image_uri === "") {
@@ -270,7 +270,7 @@ function processCurrentSection(): Section {
             ) {
                 console.log("Encountered graphic asset");
                 if (isPartOfTabList(component))
-                    continue
+                    continue;
                 
                 const grahpic_uri = component.getAttribute("data-src");
                 if (grahpic_uri === null || grahpic_uri === "") {
@@ -288,6 +288,19 @@ function processCurrentSection(): Section {
                 output_element.src = ASSET_BASE_PATH + asset.name;
                 output_current_chunk.appendChild(output_element);
 
+            }
+
+            // check for code blocks
+            else if (
+                component.tagName.toLowerCase() === "code"
+            ) {
+                console.log("Encountered code block");
+                if (isPartOfTabList(component))
+                    continue;
+                
+                const code_block = component.cloneNode(true) as HTMLDivElement;
+                code_block.style.whiteSpace = "pre-wrap";
+                output_current_chunk.appendChild(code_block);
             }
 
             // check for tablists
@@ -346,14 +359,14 @@ async function saveSection(_section: Section) {
         mode: "readwrite"
     });
 
-    // open the module directory
-    const module_directory_name = _section.module_index + "_" + _section.module_title.replace(" ", "_");
+    // @ts-ignore open the module directory
+    const module_directory_name = _section.module_index + "_" + _section.module_title.replaceAll(" ", "_");
     const module_directory_handle = await main_directory_handle.getDirectoryHandle(module_directory_name, {
         create: true
     });
 
-    // save the section file
-    const section_file_name = _section.module_index + "_" + _section.section_index + "_" + _section.section_title.replace(" ", "_") + ".html";
+    // @ts-ignore save the section file
+    const section_file_name = _section.module_index + "_" + _section.section_index + "_" + _section.section_title.replaceAll(" ", "_") + ".html";
     const section_file_handle = await module_directory_handle.getFileHandle(section_file_name, {
         create: true
     });

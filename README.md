@@ -14,3 +14,17 @@ https://github.com/bendersej/chrome-extension-typescript/tree/master
 
 Possible hot extension reloader for later:
 https://github.com/SimplifyJobs/webpack-ext-reloader/
+
+Possibly add this to tsconfig:
+
+
+```json
+
+,
+        "lib": [
+            "ES6",
+            "DOM",
+            "DOM.Iterable",
+            "ES2021.String",
+        ]
+```
