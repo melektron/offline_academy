@@ -1,8 +1,8 @@
 
 
 
-const ASSET_BASE_PATH = "./assets/"
-
+const ASSETS_DIR_NAME = "assets"
+const ASSET_BASE_PATH = "./" + ASSETS_DIR_NAME + "/";
 
 
 const article = document.getElementsByClassName("content-chunks");
@@ -342,8 +342,54 @@ async function saveSection(_section: Section) {
     
     // ask for the directory to save files to
     // @ts-ignore for some reason showDirectoryPicker() is detected here
-    let main_directory_handle: FileSystemDirectoryHandle = await window.showDirectoryPicker();
+    const main_directory_handle: FileSystemDirectoryHandle = await window.showDirectoryPicker({
+        mode: "readwrite"
+    });
 
+    // open the module directory
+    const module_directory_name = _section.module_index + "_" + _section.module_title.replace(" ", "_");
+    const module_directory_handle = await main_directory_handle.getDirectoryHandle(module_directory_name, {
+        create: true
+    });
+
+    // save the section file
+    const section_file_name = _section.module_index + "_" + _section.section_index + "_" + _section.section_title.replace(" ", "_") + ".html";
+    const section_file_handle = await module_directory_handle.getFileHandle(section_file_name, {
+        create: true
+    });
+    // @ts-ignore for some reason  createWritable is also not found by TS
+    const section_file_writable  = await section_file_handle.createWritable();
+    await section_file_writable.write(
+        "<html><body>" +
+        _section.document.innerHTML + 
+        "</body></html>"
+    );
+    await section_file_writable.close();
+
+
+    // open the asset directory 
+    const asset_directory_handle = await module_directory_handle.getDirectoryHandle("assets", {
+        create: true
+    });
+    // save all the assets asynchronously
+    for (const asset of settled_assets) {
+        if (asset.status === "rejected") {
+            console.error("Failed to download an asset (unknown name)");
+            continue;
+        }
+        console.log("Saving asset: ", asset.value.name);
+        const file_handle = await asset_directory_handle.getFileHandle(asset.value.name, {
+            create: true
+        });
+        // @ts-ignore for some reason createWritable is also not found by TS
+        const file_writable  = await file_handle.createWritable();
+        file_writable.write(asset.value.data).then(async () => {
+            console.log("Done saving asset: ", asset.value.name);
+            await file_writable.close();
+        }).catch(async () => {
+            console.error("Failed to save asset: ", asset.value.name);
+        });
+    }
 
 }
 
