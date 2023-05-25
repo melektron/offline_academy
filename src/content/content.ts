@@ -102,6 +102,28 @@ class Section {
             let output_current_chunk = document.createElement("div")
             output_current_chunk.id = chunk.id;
 
+            /**
+             * In order to parse tablists, we need to click on the buttons in the tablists, which
+             * in-turn causes Cisco's react codebase to modify the DOM. When iterating over assets in
+             * a chunk, if we have found a tablist asset, we use the Element.contains() method to
+             * check any further assets for whether they are part of the tablist. If they are part of the 
+             * tablist, they need to be ignored, because they would have been processed inside the tablist processor.
+             * The problem with this approach is, that clicking the buttons inside the tablist causes React to remove
+             * the previously queried asset elements from the DOM (and therefor from the tablist) in order to 
+             * show different ones. So when later checking if an asset is part of a tablist, none of the assets that were
+             * actually part of the tablist are anymore and therefore they get wrongfully processed and added to the output 
+             * document. 
+             * In order to prevent this (assuming there is only one tablist per chunk), the tablist always needs 
+             * to be processed after all other assets. However, in some cases there are more assets after a tablist that
+             * are not part of the tablist. If they were processed before the tablist, order of elements on the output
+             * document wouldn't be correct anymore.
+             * So, as soon as we encounter a tablist, we save all assets collected until then in the "output_current_chunk_before_tablist" variable,
+             * and assign the output_current_chunk variable a new div element, that is then filled with the remaining assets.
+             * At the end, the tablist is processed and appends output to the "output_current_chunk_before_tablist" element.
+             * Then all the elements from after the tablist are added to it. This way, their order is preserved.
+             */
+            let output_current_chunk_before_tablist: HTMLDivElement | undefined = undefined;
+
             // find all content components in the chunk
             // this includes direct text assets, code blocks, media assets and tablists. Some of these may
             // need to be treated specially
@@ -195,12 +217,22 @@ class Section {
                     console.log("Encountered tablist");
                     if (tablist_div !== undefined)
                         throw new Error("Encountered multiple tablists in a chunk which is not allowed.");
-                        
+                    
+                    // save the tablist for later processing (see huge comment block a few lines above)
                     tablist_div = component as HTMLDivElement;
 
-                    this.processTabList(output_current_chunk, tablist_div);
+                    // save all the assets collected until now
+                    output_current_chunk_before_tablist = output_current_chunk;
+
+                    // create a new element for the assets after the tablist
+                    output_current_chunk = document.createElement("div");
                 }
                 
+                else if (
+                    component.classList.contains("button-label")
+                )
+                    console.log("(Is tablist button, ignoring)");
+
                 // any other types of media assets like quizzes are ignored with a message
                 else
                     console.log(`(Not a relevant asset type: ${component.tagName})`)
@@ -208,8 +240,29 @@ class Section {
             
             }
 
-            // add the new content chunk to the final output to the output
-            this.output_document.appendChild(output_current_chunk);
+            // if we have encountered a tablist, process it now and assemble the output document 
+            // in the correct order
+            if (tablist_div !== undefined) {
+                // process the tablist and add it's output elements to the ones before the tablist
+                if (output_current_chunk_before_tablist === undefined)
+                    throw new Error("Processing tablist, but assets before tablist not defined");
+                this.processTabList(output_current_chunk_before_tablist, tablist_div);
+
+                // now add the output elements of all the assets after the tablist to the output
+                for (const element of output_current_chunk.children) {
+                    output_current_chunk_before_tablist.appendChild(element);
+                }
+
+                // "output_current_chunk_before_tablist" now contains the final chunk output.
+                // Add the new content chunk to the final output document.
+                this.output_document.appendChild(output_current_chunk_before_tablist);
+
+            } else {
+                // Current chunk is just a regular chronological chunk without any tablists
+                // Add the new content chunk to the final output document.
+                this.output_document.appendChild(output_current_chunk);
+            }
+
 
         }
 
