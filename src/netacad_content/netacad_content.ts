@@ -7,17 +7,12 @@ www.elektron.work
 Content script that adds download functionality to NetAcad ContentHub
 */
 
+import { sleep } from "../utils/sleep"
 
 const ASSETS_DIR_NAME = "assets"
 const ASSET_BASE_PATH = "./" + ASSETS_DIR_NAME + "/";
 
 let main_directory_handle: FileSystemDirectoryHandle | undefined = undefined;
-
-
-// https://stackoverflow.com/questions/1183872/put-a-delay-in-javascript
-function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 
 /**

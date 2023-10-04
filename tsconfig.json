@@ -6,6 +6,7 @@
         "esModuleInterop": true,
         "sourceMap": true,
         "rootDir": "src",
+        "baseUrl": "src",
         "outDir": "dist/js",
         "noEmitOnError": true,
         "typeRoots": [
