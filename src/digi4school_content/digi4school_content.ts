@@ -8,6 +8,9 @@ Content script that adds download functionality to digi4school books.
 */
 
 
+// import PDFDocument from "pdfkit"
+// import SVGtoPDF from "svg-to-pdfkit"
+// import blobStream from "blob-stream"
 import { sleep } from "utils/sleep"
 
 const ASSETS_DIR_NAME = "assets"
@@ -58,124 +61,48 @@ class BookPage {
         objects.forEach((object, index, parent) => {
             if (!(object instanceof HTMLObjectElement))
                 return;
-            console.log(object.contentDocument?.getRootNode());
-            // TODO: do something useful
+            const svg_element_original = object.contentDocument?.querySelector("svg");
+            if (svg_element_original == null)
+                return;
+
+            const svg_element = svg_element_original.cloneNode(true) as SVGSVGElement;
+
+            this.processImages(svg_element);
+
+            // TODO: convert to PDF https://pdfkit.org/docs/getting_started.html
+
+            const blob = new Blob([svg_element.outerHTML], {
+                type: "image/svg+xml"
+            });
+
+            const filename = "book_" + object.parentElement?.id + ".svg";
+
+            // download using element in order to define name
+            const download_link = document.createElement("a");
+            download_link.href = URL.createObjectURL(blob);
+            download_link.download = filename;
+
+            document.body.appendChild(download_link);
+            download_link.click();
+            document.body.removeChild(download_link);
         });
     }
 
-    processImage(current_chunk: HTMLDivElement, img_element: Element) {
-        const image_uri = img_element.getAttribute("src");
-        if (image_uri === null || image_uri === "") {
-            console.warn("Could not find image URI in image asset, skipping.")
-            return;
-        }
-        const asset = downloadAsset(image_uri);
-        if (asset.name === undefined) {
-            console.warn("Media image asset URI invalid, skipping.")
-            return;
-        }
-        this.assets.push(asset);
-
-        const output_element = document.createElement("img");
-        output_element.src = ASSET_BASE_PATH + asset.name;
-        current_chunk.appendChild(output_element);
+    /**
+     * Processes all images in an SVG document to replace external links with embeds
+     * https://stackoverflow.com/questions/934012/get-image-data-url-in-javascript
+     * @param target_svg target SVG element to modify
+     */
+    processImages(target_svg: SVGSVGElement) {
+        const images = target_svg.querySelectorAll("image");
+        images.forEach((element, key, parent) => {
+            console.log(element);
+        });
     }
 
-    processGraphic(current_chunk: HTMLDivElement, svg_element: Element) {
-        const grahpic_uri = svg_element.getAttribute("data-src");
-        if (grahpic_uri === null || grahpic_uri === "") {
-            console.warn("Could not find graphic URI in graphic asset, skipping.")
-            return;
-        }
-        const asset = downloadAsset(grahpic_uri);
-        if (asset.name === undefined) {
-            console.warn("Graphic asset URI invalid, skipping.")
-            return;
-        }
-        this.assets.push(asset);
-        
-        const output_element = document.createElement("img");
-        output_element.src = ASSET_BASE_PATH + asset.name;
-        current_chunk.appendChild(output_element);
+    processImage(target_image: SVGImageElement) {
     }
 
-    async processTabList(current_chunk: HTMLDivElement, tablist_element: HTMLDivElement) {
-        // find all the selection buttons in the tablist
-        const tablist_selection_buttons = tablist_element.getElementsByClassName("mbar-buttons-wrapper")[0].children;
-
-        // go through all button and therefore selections individually
-        for (const selection_button_element of tablist_selection_buttons) {
-            const button = selection_button_element as HTMLButtonElement;
-            
-            // The button text will be added to the document as a header 3
-            const tab_header = document.createElement("h3");
-            tab_header.innerText = button.innerText;
-            current_chunk.appendChild(tab_header);
-
-            // activate the tab
-            button.click();
-
-            // process the content of the current tab
-            const tab_content_wrapper = tablist_element.getElementsByClassName("mbar-content-wrapper")[0] as HTMLDivElement;
-
-            // if there are any media assets in the tab that are loaded asynchronously using react we might need to wait
-            // a bit until they are fully loaded. Normal images don't suffer from this.
-            if (tab_content_wrapper.querySelector(".loader-wrap,.Media") != null)
-                await sleep(800);
-            
-            this.processTabContent(current_chunk, tab_content_wrapper);
-        }
-    }
-
-    processTabContent(current_chunk: HTMLDivElement, content_wrapper: HTMLDivElement) {
-        // find all content components in the tab.
-        // this includes direct text assets, code blocks and media assets. (Tablist in tablist does not exist)
-        const content_components = content_wrapper.querySelectorAll(".text-asset,img,svg,code");
-        
-        // go through all assets in the tab
-        for (const component of content_components) {
-            console.log("Processing tab component: ", component);
-
-            // check for text assets
-            if (
-                component.classList.contains("text-asset")
-            ) {
-                console.log("Encountered text asset in tab");
-                
-                for (const asset_element of component.children) {
-                    const asset_element_copy = asset_element.cloneNode(true);
-                    current_chunk.appendChild(asset_element_copy);
-                }
-            }
-
-            // check for images
-            else if (
-                component.tagName.toLocaleLowerCase() === "img"
-            ) {
-                this.processImage(current_chunk, component);
-            }
-
-            // check for graphics (SVGs)
-            else if (
-                component.tagName.toLocaleLowerCase() === "svg"
-            ) {
-                this.processGraphic(current_chunk, component);
-            }
-
-            // check for code blocks
-            else if (
-                component.tagName.toLowerCase() === "code"
-            ) {
-                const code_block = component.cloneNode(true) as HTMLDivElement;
-                code_block.style.whiteSpace = "pre-wrap";
-                current_chunk.appendChild(code_block);
-            }
-            
-            // in case there is any asset that doesn't match the above criteria (shouldn't ever happen)
-            else
-                console.log(`(Not a relevant asset type inside tablist tab: ${component.tagName})`)
-        }
-    }
 }
 
 /**
@@ -291,15 +218,15 @@ async function buttonCallback() {
 
     // ask for the directory to save files to
     // @ts-ignore for some reason showDirectoryPicker() is detected here
-    main_directory_handle = await window.showDirectoryPicker({
-        mode: "readwrite"
-    });
+    //main_directory_handle = await window.showDirectoryPicker({
+    //    mode: "readwrite"
+    //});
 
     const page = new BookPage();
     await page.processCurrent();
     //await savePage(page);
 
-    window.alert(`Download of page complete.`);
+    //window.alert(`Download of page complete.`);
 }
 
 /**
