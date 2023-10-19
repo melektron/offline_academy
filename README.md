@@ -5,8 +5,11 @@ Browser extension which adds save/download buttons to some locked-ecosystem webs
 Currently supported browsers:
 
 - Chromium-based browsers
+- Firefox
 
-(Support for others should be trivial to implement, feel free to add it in a PR)
+> Firefox and Chromium (and some other browsers) have mostly compatible extension systems (with manifest and layout), so these all work with one single build
+> 
+> Support for others should be trivial to implement as well, as it would simply require the content scripts to be executed on a target webpage. Feel free to add it in a PR.
 
 Currently supported websites:
 
@@ -64,16 +67,23 @@ npm run build
 
 All build artifacts are placed in the ```dist``` folder. 
 
-(Currently, as only chromium-based browsers are supported, this folder is the unpacked chrome extension, although subfolders may be added for more browsers in the future.)
+These artifacts are compatible with both Firefox and Chromium-based browsers as well as some others who support his common manifest.json-based extension approach. 
+
+Depending on the browser, loading the extension might differ slightly.
 
 ### Install in chromium-based browsers
 
 You can load the unpacked extensions by selecting the ```dist``` folder according to [Google's developer documentation](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/#load-unpacked).
 
+### Install in Firefox
+
+You can load the unpacked add-on (as it's called in Firefox) by selecting the ```dist/manifest.json``` file according to [Mozilla's developer documentation](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Your_first_WebExtension#installing)
+
 
 ## Contributions
 
 I am open to contributions of any kind, so if you have any feature ideas, bugfixes or typo fixes feel free to submit an Issue or - even better - a Pull Request.
+
 
 ## Development notes and links
 
