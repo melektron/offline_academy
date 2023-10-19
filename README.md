@@ -37,7 +37,7 @@ For now, you can use ```rsvg-convert``` to convert the SVG to a PDF:
 
 ```bash
 # According to https://superuser.com/questions/381125/how-do-i-convert-an-svg-to-a-pdf-on-linux
-rsvg-convert -o book_pg50.pdf book_pg50.svg
+rsvg-convert -f pdf -o book_pg50.pdf book_pg50.svg
 ```
 
 The tool is included with ```librsvg2``` which you should be able to get with most package managers:
