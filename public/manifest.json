@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Offline Academy",
     "version": "1.0",
-    "description": "Adds a download button the Cisco NetAcad courses and allows exporting them as fully offline plain-HTML based documents",
+    "description": "Adds download buttons to online locked-ecosystem educational websites and eBook readers",
     "content_scripts": [
         {
             "js": [
