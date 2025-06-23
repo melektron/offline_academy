@@ -551,3 +551,5 @@ function main() {
     installButton()
 }
 setTimeout(main, 1500);
+
+export {};

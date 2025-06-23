@@ -8,6 +8,7 @@ module.exports = {
       background: path.resolve(__dirname, "src", "background", "background.ts"),
       netacad_content: path.resolve(__dirname, "src", "netacad_content" , "netacad_content.ts"),
       digi4school_content: path.resolve(__dirname, "src", "digi4school_content" , "digi4school_content.ts"),
+      bedienungsanleitungen_content: path.resolve(__dirname, "src", "bedienungsanleitungen_content" , "bedienungsanleitungen_content.ts"),
    },
    output: {
       path: path.join(__dirname, "dist"),

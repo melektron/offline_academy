@@ -135,3 +135,5 @@ function main() {
     console.log("done installing offline academy");
 }
 setTimeout(main, 1500);
+
+export {};

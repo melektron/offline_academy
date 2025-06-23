@@ -19,6 +19,15 @@
             "matches": [
                 "https://a.digi4school.at/*"
             ]
+        },
+        {
+            "js": [
+                "bedienungsanleitungen_content.js"
+            ],
+            "matches": [
+                "https://www.bedienungsanleitu.ng/*",
+                "https://bedienungsanleitu.ng/*"
+            ]
         }
     ]
 }
